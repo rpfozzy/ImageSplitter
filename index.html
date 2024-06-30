@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Splitter - 6 Parts</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        #uploadBtn, #downloadBtn {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #uploadBtn:hover, #downloadBtn:hover {
+            background-color: #45a049;
+        }
+        #downloadBtn {
+            display: none;
+        }
+        #progressBar {
+            width: 100%;
+            background-color: #ddd;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        #progressBar > div {
+            width: 0%;
+            height: 30px;
+            background-color: #4CAF50;
+            border-radius: 5px;
+            transition: width 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Splitter - 6 Parts</h1>
+        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+        <button id="uploadBtn">Upload Image</button>
+        <div id="progressBar"><div></div></div>
+        <button id="downloadBtn">Download ZIP</button>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const progressBar = document.getElementById('progressBar').firstElementChild;
+
+        uploadBtn.addEventListener('click', () => imageInput.click());
+        imageInput.addEventListener('change', handleImageUpload);
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => processImage(img);
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function processImage(img) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const partWidth = img.width / 3;
+            const partHeight = img.height / 2;
+            const zip = new JSZip();
+            const backgroundFolder = zip.folder('background');
+            const overworldCubemapFolder = zip.folder('overworld_cubemap');
+
+            const parts = [
+                { name: 'cubemap_5.png', panoramaName: 'panorama_5.png', x: 0, y: 0 },
+                { name: 'cubemap_4.png', panoramaName: 'panorama_4.png', x: partWidth, y: 0 },
+                { name: 'cubemap_0.png', panoramaName: 'panorama_0.png', x: partWidth * 2, y: 0 },
+                { name: 'cubemap_1.png', panoramaName: 'panorama_1.png', x: 0, y: partHeight },
+                { name: 'cubemap_2.png', panoramaName: 'panorama_2.png', x: partWidth, y: partHeight },
+                { name: 'cubemap_3.png', panoramaName: 'panorama_3.png', x: partWidth * 2, y: partHeight }
+            ];
+
+            canvas.width = partWidth;
+            canvas.height = partHeight;
+
+            const promises = parts.map((part, index) => {
+                return new Promise((resolve) => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, part.x, part.y, partWidth, partHeight, 0, 0, partWidth, partHeight);
+
+                    if (part.name === 'cubemap_5.png') {
+                        ctx.save();
+                        ctx.translate(partWidth / 2, partHeight / 2);
+                        ctx.rotate(Math.PI);
+                        ctx.translate(-partWidth / 2, -partHeight / 2);
+                        ctx.drawImage(canvas, 0, 0);
+                        ctx.restore();
+                    }
+
+                    canvas.toBlob((blob) => {
+                        overworldCubemapFolder.file(part.name, blob);
+                        backgroundFolder.file(part.panoramaName, blob);
+                        updateProgress((index + 1) / parts.length * 100);
+                        resolve();
+                    }, 'image/png');
+                });
+            });
+
+            Promise.all(promises).then(() => {
+                finishProcessing(zip);
+            });
+        }
+
+        function updateProgress(percent) {
+            progressBar.style.width = percent + '%';
+        }
+
+        function finishProcessing(zip) {
+            zip.generateAsync({ type: 'blob' }).then((content) => {
+                const url = URL.createObjectURL(content);
+                downloadBtn.href = url;
+                downloadBtn.download = 'split_images.zip';
+                downloadBtn.style.display = 'inline-block';
+                downloadBtn.addEventListener('click', () => {
+                    saveAs(content, 'split_images.zip');
+                });
+            });
+        }
+    </script>
+</body>
+  </html>
