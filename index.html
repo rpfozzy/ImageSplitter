@@ -68,91 +68,91 @@
     </div>
 
     <script>
-        const imageInput = document.getElementById('imageInput');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const progressBar = document.getElementById('progressBar').firstElementChild;
+    const imageInput = document.getElementById('imageInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const progressBar = document.getElementById('progressBar').firstElementChild;
 
-        uploadBtn.addEventListener('click', () => imageInput.click());
-        imageInput.addEventListener('change', handleImageUpload);
+    uploadBtn.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', handleImageUpload);
 
-        function handleImageUpload(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => processImage(img);
-                    img.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
+    function handleImageUpload(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => processImage(img);
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
         }
+    }
 
-        function processImage(img) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const partWidth = img.width / 3;
-            const partHeight = img.height / 2;
-            const zip = new JSZip();
-            const backgroundFolder = zip.folder('background');
-            const overworldCubemapFolder = zip.folder('overworld_cubemap');
+    function processImage(img) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const partWidth = img.width / 3;
+        const partHeight = img.height / 2;
+        const zip = new JSZip();
+        const backgroundFolder = zip.folder('background');
+        const overworldCubemapFolder = zip.folder('overworld_cubemap');
 
-            const parts = [
-                { name: 'cubemap_5.png', panoramaName: 'panorama_5.png', x: 0, y: 0 },
-                { name: 'cubemap_4.png', panoramaName: 'panorama_4.png', x: partWidth, y: 0 },
-                { name: 'cubemap_0.png', panoramaName: 'panorama_0.png', x: partWidth * 2, y: 0 },
-                { name: 'cubemap_1.png', panoramaName: 'panorama_1.png', x: 0, y: partHeight },
-                { name: 'cubemap_2.png', panoramaName: 'panorama_2.png', x: partWidth, y: partHeight },
-                { name: 'cubemap_3.png', panoramaName: 'panorama_3.png', x: partWidth * 2, y: partHeight }
-            ];
+        const parts = [
+            { name: 'cubemap_5.png', panoramaName: 'panorama_5.png', x: 0, y: 0 },
+            { name: 'cubemap_4.png', panoramaName: 'panorama_4.png', x: partWidth, y: 0 },
+            { name: 'cubemap_0.png', panoramaName: 'panorama_0.png', x: partWidth * 2, y: 0 },
+            { name: 'cubemap_1.png', panoramaName: 'panorama_1.png', x: 0, y: partHeight },
+            { name: 'cubemap_2.png', panoramaName: 'panorama_2.png', x: partWidth, y: partHeight },
+            { name: 'cubemap_3.png', panoramaName: 'panorama_3.png', x: partWidth * 2, y: partHeight }
+        ];
 
-            canvas.width = partWidth;
-            canvas.height = partHeight;
+        canvas.width = partWidth;
+        canvas.height = partHeight;
 
-            const promises = parts.map((part, index) => {
-                return new Promise((resolve) => {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, part.x, part.y, partWidth, partHeight, 0, 0, partWidth, partHeight);
+        const promises = parts.map((part, index) => {
+            return new Promise((resolve) => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, part.x, part.y, partWidth, partHeight, 0, 0, partWidth, partHeight);
 
-                    if (part.name === 'cubemap_5.png') {
-                        ctx.save();
-                        ctx.translate(partWidth / 2, partHeight / 2);
-                        ctx.rotate(Math.PI);
-                        ctx.translate(-partWidth / 2, -partHeight / 2);
-                        ctx.drawImage(canvas, 0, 0);
-                        ctx.restore();
-                    }
+                if (part.name === 'cubemap_5.png' || part.name === 'cubemap_4.png') {
+                    ctx.save();
+                    ctx.translate(partWidth / 2, partHeight / 2);
+                    ctx.rotate(Math.PI);
+                    ctx.translate(-partWidth / 2, -partHeight / 2);
+                    ctx.drawImage(canvas, 0, 0);
+                    ctx.restore();
+                }
 
-                    canvas.toBlob((blob) => {
-                        overworldCubemapFolder.file(part.name, blob);
-                        backgroundFolder.file(part.panoramaName, blob);
-                        updateProgress((index + 1) / parts.length * 100);
-                        resolve();
-                    }, 'image/png');
-                });
+                canvas.toBlob((blob) => {
+                    overworldCubemapFolder.file(part.name, blob);
+                    backgroundFolder.file(part.panoramaName, blob);
+                    updateProgress((index + 1) / parts.length * 100);
+                    resolve();
+                }, 'image/png');
             });
+        });
 
-            Promise.all(promises).then(() => {
-                finishProcessing(zip);
+        Promise.all(promises).then(() => {
+            finishProcessing(zip);
+        });
+    }
+
+    function updateProgress(percent) {
+        progressBar.style.width = percent + '%';
+    }
+
+    function finishProcessing(zip) {
+        zip.generateAsync({ type: 'blob' }).then((content) => {
+            const url = URL.createObjectURL(content);
+            downloadBtn.href = url;
+            downloadBtn.download = 'split_images.zip';
+            downloadBtn.style.display = 'inline-block';
+            downloadBtn.addEventListener('click', () => {
+                saveAs(content, 'split_images.zip');
             });
-        }
-
-        function updateProgress(percent) {
-            progressBar.style.width = percent + '%';
-        }
-
-        function finishProcessing(zip) {
-            zip.generateAsync({ type: 'blob' }).then((content) => {
-                const url = URL.createObjectURL(content);
-                downloadBtn.href = url;
-                downloadBtn.download = 'split_images.zip';
-                downloadBtn.style.display = 'inline-block';
-                downloadBtn.addEventListener('click', () => {
-                    saveAs(content, 'split_images.zip');
-                });
-            });
-        }
-    </script>
+        });
+    }
+</script>
 </body>
-  </html>
+</html>
